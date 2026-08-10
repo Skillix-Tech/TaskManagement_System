@@ -39,16 +39,17 @@
 }
 
 /* ============================================
-   Single-file view router
-   Only one .view section is visible at a time.
+   Multi-page layout
+   Login, Admin, and Team Member are separate
+   HTML pages, so every page view is visible.
    ============================================ */
 
 .view {
-  display: none;
+  display: block !important;
 }
 
 .view.visible {
-  display: block;
+  display: block !important;
 }
 
 html, body {
