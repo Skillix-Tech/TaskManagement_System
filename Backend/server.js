@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
+const memberRoutes = require("./routes/memberRoutes");
 
 const app = express();
 
@@ -14,6 +15,8 @@ connectDB();
 app.get("/", (req, res) => {
     res.send("TaskFlow Backend Running");
 });
+
+app.use("/api/member", memberRoutes);
 
 const PORT = process.env.PORT || 5000;
 
