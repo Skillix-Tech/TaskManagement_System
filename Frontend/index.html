@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow - Login</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section id="view-login" class="view">
+  <div class="login-shell">
+    <div class="login-card">
+
+      <!-- Left hero panel -->
+      <div class="login-hero">
+        <div class="brand">
+          <span class="brand-mark">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          </span>
+          TaskFlow
+        </div>
+
+        <div class="hero-illustration">
+          <svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- gears -->
+            <g fill="#facc15">
+              <circle cx="150" cy="45" r="22"/>
+            </g>
+            <g fill="#ec4899">
+              <circle cx="178" cy="80" r="26"/>
+            </g>
+            <g fill="#60a5fa">
+              <circle cx="168" cy="122" r="14"/>
+            </g>
+            <g fill="#22c55e">
+              <circle cx="42" cy="150" r="24"/>
+            </g>
+            <g fill="#38bdf8">
+              <circle cx="34" cy="188" r="13"/>
+            </g>
+            <!-- clipboard -->
+            <rect x="52" y="52" width="96" height="128" rx="10" fill="#ffffff"/>
+            <rect x="52" y="52" width="96" height="128" rx="10" stroke="#1e3a8a" stroke-width="4" fill="none"/>
+            <rect x="78" y="42" width="44" height="20" rx="5" fill="#dbeafe" stroke="#1e3a8a" stroke-width="3"/>
+            <g stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M68 84l5 5 11-11"/>
+            </g>
+            <line x1="92" y1="88" x2="132" y2="88" stroke="#93c5fd" stroke-width="5" stroke-linecap="round"/>
+            <g stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M68 110l5 5 11-11"/>
+            </g>
+            <line x1="92" y1="114" x2="132" y2="114" stroke="#93c5fd" stroke-width="5" stroke-linecap="round"/>
+            <g stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M68 136l5 5 11-11"/>
+            </g>
+            <line x1="92" y1="140" x2="132" y2="140" stroke="#93c5fd" stroke-width="5" stroke-linecap="round"/>
+            <rect x="66" y="160" width="14" height="14" rx="3" fill="none" stroke="#93c5fd" stroke-width="3"/>
+            <line x1="92" y1="167" x2="120" y2="167" stroke="#93c5fd" stroke-width="5" stroke-linecap="round"/>
+          </svg>
+        </div>
+
+        <div class="hero-copy">
+          <h1>Manage tasks effortlessly.</h1>
+          <p>Track team progress, assign work, and collaborate efficiently from one place.</p>
+          <div class="pill-row">
+            <span class="pill">Task Assignment</span>
+            <span class="pill">Progress Tracking</span>
+            <span class="pill">Team Collaboration</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right form panel -->
+      <div class="login-form-side">
+        <div class="login-panel">
+          <div class="login-panel-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h2>Welcome Back</h2>
+          <p class="subtitle">Sign in to continue managing your tasks.</p>
+
+          <div id="login-error" class="form-error"></div>
+
+          <form id="login-form" novalidate>
+            <input type="hidden" id="login-role" name="login-role" value="admin">
+            <div class="field">
+              <label for="email">Email Address</label>
+              <input type="email" id="email" placeholder="you@company.com" autocomplete="username">
+            </div>
+
+            <div class="field">
+              <label for="password">Password</label>
+              <input type="password" id="password" placeholder="••••••••••" autocomplete="current-password">
+            </div>
+
+            <div class="field-row-between">
+              <label class="check-label">
+                <input type="checkbox" id="remember">
+                Remember me
+              </label>
+              <a href="#" class="link-quiet">Forgot Password?</a>
+            </div>
+
+            <button type="button" class="btn btn-primary" id="btn-signin-admin" data-role-submit="admin">Sign in as Admin</button>
+            <button type="button" class="btn btn-outline" id="btn-signin-member" data-role-submit="member">Sign in as Team Member</button>
+          </form>
+
+          <p class="login-footnote">— Only Admin and members can login —</p>
+          <p class="copyright">© 2026 TaskFlow. All rights reserved.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<script src="script.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    try {
+      initApp();
+    } catch (err) {
+      console.error("TaskFlow failed to start:", err);
+    }
+  });
+</script>
+</body>
+</html>

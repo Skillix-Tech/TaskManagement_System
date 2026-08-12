@@ -1,10 +1,8 @@
 /* ============================================
-   TaskFlow — Single-Page App Logic
-   All three views (login, admin, member) live in
-   one HTML file. This file shows/hides the right
-   view and wires up each view's behavior. Task
-   data is persisted to localStorage so the Admin
-   and Team Member views stay in sync.
+   TaskFlow — Multi-Page App Logic
+   Login, Admin, and Team Member are separate
+   HTML pages. Shared task/session data is stored
+   in localStorage so all pages stay synchronized.
    ============================================ */
 
 const STORAGE_KEY = "taskflow_tasks_v1";
@@ -185,47 +183,57 @@ const ICONS = {
 };
 
 /* ============================================
-   VIEW ROUTER
-   ============================================ */
-
-function showView(name) {
-  document.querySelectorAll(".view").forEach((el) => {
-    el.classList.remove("visible");
-    el.style.display = "none";
-  });
-  const target = document.getElementById("view-" + name);
-  if (target) {
-    target.style.display = "";
-    target.classList.add("visible");
-  }
-  window.scrollTo(0, 0);
-}
-
-/* ============================================
-   APP ENTRY POINT
+   MULTI-PAGE APP ENTRY POINT
    ============================================ */
 
 function initApp() {
-  wireLoginView();
-  wireAdminView();
-  wireMemberView();
-
-  // Route to the right view based on any existing session.
   const session = getSession();
-  if (session && session.role === "Administrator") {
+
+  // LOGIN PAGE
+  if (document.getElementById("login-form")) {
+    if (session && session.role === "Administrator") {
+      window.location.href = "admin.html";
+      return;
+    }
+
+    if (session && session.role === "Team Member") {
+      window.location.href = "member.html";
+      return;
+    }
+
+    wireLoginView();
+    return;
+  }
+
+  // ADMIN PAGE
+  if (document.getElementById("admin-task-table-body")) {
+    if (!session || session.role !== "Administrator") {
+      window.location.href = "login.html";
+      return;
+    }
+
+    wireAdminView();
     renderAdminView();
-    showView("admin");
-  } else if (session && session.role === "Team Member") {
+    return;
+  }
+
+  // TEAM MEMBER PAGE
+  if (document.getElementById("member-task-table-body")) {
+    if (!session || session.role !== "Team Member") {
+      window.location.href = "login.html";
+      return;
+    }
+
+    wireMemberView();
     renderMemberView();
-    showView("member");
-  } else {
-    showView("login");
+    return;
   }
 }
 
 /* ============================================
    LOGIN VIEW
    ============================================ */
+
 
 function wireLoginView() {
   const form = document.getElementById("login-form");
@@ -259,12 +267,10 @@ function wireLoginView() {
 
     if (role === "admin") {
       setSession({ name: "Alex Morgan", role: "Administrator", initials: "AM" });
-      renderAdminView();
-      showView("admin");
+      window.location.href = "admin.html";
     } else {
       setSession({ name: "Sara Chen", role: "Team Member", initials: "SC" });
-      renderMemberView();
-      showView("member");
+      window.location.href = "member.html";
     }
   }
 
@@ -283,7 +289,7 @@ let adminTasks = [];
 function wireAdminView() {
   document.getElementById("admin-logout-btn").addEventListener("click", () => {
     clearSession();
-    showView("login");
+    window.location.href = "login.html";
   });
 
   const modal = document.getElementById("task-modal");
@@ -526,7 +532,7 @@ let memberSelectedId = null;
 function wireMemberView() {
   document.getElementById("member-logout-btn").addEventListener("click", () => {
     clearSession();
-    showView("login");
+    window.location.href = "login.html";
   });
 
   document.getElementById("member-task-table-body").addEventListener("click", (e) => {
