@@ -3,11 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
-
-const adminRoutes = require("./routes/adminRoutes");
 const memberRoutes = require("./routes/memberRoutes");
-
-const path = require("path");
 
 const app = express();
 
@@ -25,10 +21,6 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "../Frontend/index.html"));
 });
 
-// Admin routes
-app.use("/api/admin", adminRoutes);
-
-// Member routes
 app.use("/api/member", memberRoutes);
 
 const PORT = process.env.PORT || 5000;
