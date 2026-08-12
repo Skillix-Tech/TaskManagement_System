@@ -15,7 +15,7 @@ app.use(express.json());
 connectDB();
 
 app.get("/", (req, res) => {
-    res.send("TaskFlow Backend Running");
+    res.sendFile(path.join(__dirname,"../Frontend/index.html"));
 });
 
 // Authentication
