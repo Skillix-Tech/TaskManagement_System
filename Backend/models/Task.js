@@ -8,7 +8,8 @@ const taskSchema = new mongoose.Schema(
     },
 
     description: {
-      type: String
+      type: String,
+      default: ""
     },
 
     assignedTo: {
@@ -33,6 +34,11 @@ const taskSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "in_progress", "completed", "overdue"],
       default: "pending"
+    },
+
+    updateDescription: {
+      type: String,
+      default: ""
     },
 
     deadline: {
