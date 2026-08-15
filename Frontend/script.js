@@ -1,1700 +1,1017 @@
-/* ============================================
-   TaskFlow — Multi-Page App Logic
+// =====================================================
+// TASKFLOW FRONTEND JAVASCRIPT
+// =====================================================
 
-   Login, Admin, and Team Member are separate
-   HTML pages.
+document.addEventListener("DOMContentLoaded", () => {
 
-   LOGIN:
-   Login credentials are checked by the backend.
-   Backend endpoint:
-   POST http://localhost:5000/api/auth/login
+    console.log("TaskFlow frontend loaded");
 
-   TASKS:
-   Task data is currently stored in localStorage
-   so all pages stay synchronized.
-   ============================================ */
+    // =================================================
+    // LOGIN PAGE
+    // =================================================
 
-const STORAGE_KEY = "taskflow_tasks_v1";
-const SESSION_KEY = "taskflow_session_v1";
-const TOKEN_KEY = "taskflow_token";
+    const adminLoginButton = document.getElementById("btn-signin-admin");
+    const memberLoginButton = document.getElementById("btn-signin-member");
 
-/* ============================================
-   Seed data (first run only)
-   ============================================ */
+    if (adminLoginButton) {
+        adminLoginButton.addEventListener("click", () => {
+            login("admin");
+        });
+    }
 
-const SEED_TASKS = [
-  {
-    id: "t1",
-    title: "Redesign landing page",
-    assignedTo: "Sara Chen",
-    assignedBy: "Alex Morgan",
-    deadline: "2026-07-18",
-    priority: "High",
-    status: "In Progress",
-    description:
-      "Refresh the marketing landing page with the new brand palette, updated hero copy, and a clearer call to action above the fold.",
-  },
-  {
-    id: "t2",
-    title: "Fix authentication bug",
-    assignedTo: "James Park",
-    assignedBy: "Alex Morgan",
-    deadline: "2026-07-15",
-    priority: "Critical",
-    status: "Overdue",
-    description:
-      "Users are occasionally logged out mid-session. Investigate the token refresh flow and ship a fix with regression tests.",
-  },
-  {
-    id: "t3",
-    title: "Redesign landing page",
-    assignedTo: "Sara Chen",
-    assignedBy: "Alex Morgan",
-    deadline: "2026-07-18",
-    priority: "High",
-    status: "Pending",
-    description:
-      "Second pass on the landing page: revise the pricing section layout.",
-  },
-  {
-    id: "t4",
-    title: "Redesign landing page",
-    assignedTo: "Sara Chen",
-    assignedBy: "Alex Morgan",
-    deadline: "2026-07-18",
-    priority: "Low",
-    status: "Pending",
-    description:
-      "Swap in the new footer illustration once the asset is ready.",
-  },
-  {
-    id: "t5",
-    title: "Redesign landing page",
-    assignedTo: "Sara Chen",
-    assignedBy: "Alex Morgan",
-    deadline: "2026-07-18",
-    priority: "High",
-    status: "Completed",
-    description:
-      "Initial wireframe review with the design team.",
-  },
-  {
-    id: "t6",
-    title: "Redesign landing page",
-    assignedTo: "Sara Chen",
-    assignedBy: "Alex Morgan",
-    deadline: "2026-07-18",
-    priority: "High",
-    status: "Completed",
-    description:
-      "Finalize typography scale for the landing page.",
-  },
-  {
-    id: "t7",
-    title: "Redesign landing page",
-    assignedTo: "Sara Chen",
-    assignedBy: "Alex Morgan",
-    deadline: "2026-07-18",
-    priority: "High",
-    status: "In Progress",
-    description:
-      "Build the responsive nav bar for the landing page.",
-  },
-];
+    if (memberLoginButton) {
+        memberLoginButton.addEventListener("click", () => {
+            login("member");
+        });
+    }
 
-/* ============================================
-   Storage helpers
-   ============================================ */
 
-function loadTasks() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+    // =================================================
+    // ADMIN PAGE
+    // =================================================
 
-  if (!raw) {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(SEED_TASKS)
-    );
+    if (document.getElementById("allocate-form")) {
 
-    return [...SEED_TASKS];
-  }
+        console.log("Admin page detected");
 
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(SEED_TASKS)
-    );
+        loadAdminMembers();
+        loadAdminTasks();
+        loadDashboard();
 
-    return [...SEED_TASKS];
-  }
-}
+        setupTaskForm();
+        setupAdminLogout();
+    }
 
-function saveTasks(tasks) {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(tasks)
-  );
-}
 
-function getSession() {
-  try {
-    return JSON.parse(
-      localStorage.getItem(SESSION_KEY)
-    );
-  } catch (e) {
-    return null;
-  }
-}
+    // =================================================
+    // MEMBER PAGE
+    // =================================================
 
-function setSession(session) {
-  localStorage.setItem(
-    SESSION_KEY,
-    JSON.stringify(session)
-  );
-}
+    if (window.location.pathname.includes("member.html")) {
 
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(TOKEN_KEY);
-}
+        console.log("Member page detected");
 
-function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
+        loadMemberPage();
+        setupMemberLogout();
+    }
 
-/* ============================================
-   Small utilities
-   ============================================ */
+});
 
-function initials(name) {
-  if (!name) return "";
 
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0].toUpperCase())
-    .join("");
-}
+// =====================================================
+// LOGIN FUNCTION
+// =====================================================
 
-function formatDate(iso) {
-  if (!iso) return "—";
+async function login(role) {
 
-  const d = new Date(iso + "T00:00:00");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const errorBox = document.getElementById("login-error");
 
-  if (isNaN(d)) return iso;
-
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function todayLabel() {
-  return new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function priorityClass(priority) {
-  return "priority-" + priority.toLowerCase();
-}
-
-function statusClass(status) {
-  return "status-" + status
-    .toLowerCase()
-    .replace(/\s+/g, "");
-}
-
-function showToast(message) {
-  let toast = document.querySelector(".toast");
-
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.className = "toast";
-    document.body.appendChild(toast);
-  }
-
-  toast.textContent = message;
-  toast.classList.add("visible");
-
-  clearTimeout(showToast._t);
-
-  showToast._t = setTimeout(() => {
-    toast.classList.remove("visible");
-  }, 2400);
-}
-
-function escapeAttr(str) {
-  return String(str).replace(/"/g, "&quot;");
-}
-
-/* ============================================
-   Inline icon set
-   ============================================ */
-
-const ICONS = {
-  eye: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>`,
-
-  eyeSmall: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:2px;"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>`,
-
-  edit: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`,
-
-  trash: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-};
-
-/* ============================================
-   MULTI-PAGE APP ENTRY POINT
-   ============================================ */
-
-function initApp() {
-  const session = getSession();
-  const token = getToken();
-
-  /* ==========================================
-     LOGIN PAGE
-     ========================================== */
-
-  if (document.getElementById("login-form")) {
-
-    // If already logged in, redirect to correct page
-    if (session && token) {
-
-      if (session.backendRole === "admin") {
-        window.location.href = "admin.html";
+    if (!emailInput || !passwordInput) {
+        console.error("Login fields not found");
         return;
-      }
-
-      if (session.backendRole === "member") {
-        window.location.href = "member.html";
-        return;
-      }
     }
 
-    wireLoginView();
-    return;
-  }
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
 
-  /* ==========================================
-     ADMIN PAGE
-     ========================================== */
-
-  if (
-    document.getElementById(
-      "admin-task-table-body"
-    )
-  ) {
-
-    if (
-      !session ||
-      !token ||
-      session.backendRole !== "admin"
-    ) {
-      clearSession();
-      window.location.href = "index.html";
-      return;
+    // Clear previous error
+    if (errorBox) {
+        errorBox.textContent = "";
     }
 
-    wireAdminView();
-    renderAdminView();
-    return;
-  }
-
-  /* ==========================================
-     TEAM MEMBER PAGE
-     ========================================== */
-
-  if (
-    document.getElementById(
-      "member-task-table-body"
-    )
-  ) {
-
-    if (
-      !session ||
-      !token ||
-      session.backendRole !== "member"
-    ) {
-      clearSession();
-      window.location.href = "index.html";
-      return;
-    }
-
-    wireMemberView();
-    renderMemberView();
-    return;
-  }
-}
-
-/* ============================================
-   LOGIN VIEW
-   ============================================ */
-
-function wireLoginView() {
-
-  const form =
-    document.getElementById("login-form");
-
-  const errorBox =
-    document.getElementById("login-error");
-
-  /* ------------------------------------------
-     Prevent Enter from submitting.
-     User must choose Admin or Member.
-     ------------------------------------------ */
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-
-    errorBox.textContent =
-      "Please click 'Sign in as Admin' or 'Sign in as Team Member' to sign in.";
-
-    errorBox.classList.add("visible");
-  });
-
-  /* ------------------------------------------
-     Actual login function
-     ------------------------------------------ */
-
-  async function doLogin(role) {
-
-    const email =
-      document.getElementById("email").value.trim();
-
-    const password =
-      document.getElementById("password").value;
-
-    const emailPattern =
-      /^\S+@\S+\.\S+$/;
-
-    /* Validate fields */
-
+    // Validation
     if (!email || !password) {
 
-      errorBox.textContent =
-        "Please enter both your email address and password.";
+        if (errorBox) {
+            errorBox.textContent =
+                "Please enter email and password.";
+        }
 
-      errorBox.classList.add("visible");
-
-      return;
-    }
-
-    /* Validate email */
-
-    if (!emailPattern.test(email)) {
-
-      errorBox.textContent =
-        "Please enter a valid email address (e.g. you@company.com).";
-
-      errorBox.classList.add("visible");
-
-      return;
-    }
-
-    errorBox.classList.remove("visible");
-
-    /* Disable buttons during login */
-
-    const btnAdmin =
-      document.getElementById(
-        "btn-signin-admin"
-      );
-
-    const btnMember =
-      document.getElementById(
-        "btn-signin-member"
-      );
-
-    if (btnAdmin) {
-      btnAdmin.disabled = true;
-    }
-
-    if (btnMember) {
-      btnMember.disabled = true;
+        return;
     }
 
     try {
 
-      /* --------------------------------------
-         Call backend login API
-         -------------------------------------- */
+        console.log(`Logging in as ${role}...`);
 
-      const response = await fetch(
-        "http://localhost:5000/api/auth/login",
-        {
-          method: "POST",
+        const response = await fetch("/api/auth/login", {
 
-          headers: {
-            "Content-Type": "application/json"
-          },
+            method: "POST",
 
-          body: JSON.stringify({
-            email: email,
-            password: password,
-            role: role
-          })
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                email: email,
+                password: password,
+                role: role
+            })
+        });
+
+
+        const data = await response.json();
+
+        console.log("Login response:", data);
+
+
+        // Login failed
+        if (!response.ok || !data.success) {
+
+            if (errorBox) {
+                errorBox.textContent =
+                    data.message || "Login failed.";
+            }
+
+            return;
         }
-      );
 
-      const data = await response.json();
 
-      /* --------------------------------------
-         Backend rejected login
-         -------------------------------------- */
+        // =================================================
+        // SAVE LOGIN INFORMATION
+        // =================================================
 
-      if (!response.ok) {
+        localStorage.setItem(
+            "taskflow_token",
+            data.token
+        );
 
-        errorBox.textContent =
-          data.message || "Login failed.";
+        localStorage.setItem(
+            "taskflow_user",
+            JSON.stringify(data.user)
+        );
 
-        errorBox.classList.add("visible");
 
-        return;
-      }
+        // =================================================
+        // REDIRECT
+        // =================================================
 
-      /* --------------------------------------
-         Save JWT token
-         -------------------------------------- */
+        if (data.user.role === "admin") {
 
-      localStorage.setItem(
-        TOKEN_KEY,
-        data.token
-      );
+            console.log("Redirecting to admin page...");
 
-      /* --------------------------------------
-         Convert backend role into the names
-         currently used by your frontend
-         -------------------------------------- */
+            window.location.href = "/admin.html";
 
-      let frontendRole;
+        } else if (data.user.role === "member") {
 
-      if (data.user.role === "admin") {
-        frontendRole = "Administrator";
-      } else {
-        frontendRole = "Team Member";
-      }
+            console.log("Redirecting to member page...");
 
-      /* --------------------------------------
-         Save session
-         -------------------------------------- */
-
-      setSession({
-        id: data.user.id,
-        name: data.user.name,
-        email: data.user.email,
-
-        // Existing frontend role
-        role: frontendRole,
-
-        // Backend role
-        backendRole: data.user.role,
-
-        avatar: data.user.avatar || "",
-
-        initials: initials(data.user.name),
-
-        isActive: data.user.isActive
-      });
-
-      /* Clear password */
-
-      document.getElementById(
-        "password"
-      ).value = "";
-
-      /* --------------------------------------
-         Redirect according to backend role
-         -------------------------------------- */
-
-      if (data.user.role === "admin") {
-
-        window.location.href =
-          "admin.html";
-
-      } else if (
-        data.user.role === "member"
-      ) {
-
-        window.location.href =
-          "member.html";
-      }
+            window.location.href = "/member.html";
+        }
 
     } catch (error) {
 
-      console.error(
-        "Login error:",
-        error
-      );
+        console.error("Login error:", error);
 
-      errorBox.textContent =
-        "Unable to connect to the server. Please make sure the backend is running.";
-
-      errorBox.classList.add("visible");
-
-    } finally {
-
-      if (btnAdmin) {
-        btnAdmin.disabled = false;
-      }
-
-      if (btnMember) {
-        btnMember.disabled = false;
-      }
+        if (errorBox) {
+            errorBox.textContent =
+                "Unable to connect to server.";
+        }
     }
-  }
-
-  /* ------------------------------------------
-     Login buttons
-     ------------------------------------------ */
-
-  const btnAdmin =
-    document.getElementById(
-      "btn-signin-admin"
-    );
-
-  const btnMember =
-    document.getElementById(
-      "btn-signin-member"
-    );
-
-  if (btnAdmin) {
-    btnAdmin.addEventListener(
-      "click",
-      () => doLogin("admin")
-    );
-  }
-
-  if (btnMember) {
-    btnMember.addEventListener(
-      "click",
-      () => doLogin("member")
-    );
-  }
 }
 
-/* ============================================
-   ADMIN VIEW
-   ============================================ */
 
-let adminTasks = [];
+// =====================================================
+// GET LOGGED-IN USER
+// =====================================================
 
-function wireAdminView() {
+function getLoggedInUser() {
 
-  document
-    .getElementById("admin-logout-btn")
-    .addEventListener("click", () => {
+    const user = localStorage.getItem("taskflow_user");
 
-      clearSession();
-
-      window.location.href =
-        "index.html";
-    });
-
-  const modal =
-    document.getElementById("task-modal");
-
-  modal.addEventListener("click", (e) => {
-
-    if (e.target === modal) {
-      closeAdminModal();
+    if (!user) {
+        return null;
     }
-  });
 
-  document
-    .getElementById("allocate-form")
-    .addEventListener("submit", (e) => {
+    try {
+        return JSON.parse(user);
+    } catch (error) {
+        console.error("Invalid stored user:", error);
+        return null;
+    }
+}
 
-      e.preventDefault();
 
-      const session =
-        getSession() || {
-          name: "Alex Morgan"
-        };
+// =====================================================
+// ADMIN - LOAD MEMBERS
+// =====================================================
 
-      const title =
-        document
-          .getElementById("task-title")
-          .value
-          .trim();
+async function loadAdminMembers() {
 
-      const assignee =
-        document.getElementById(
-          "assign-user"
-        ).value;
+    const select = document.getElementById("assign-user");
 
-      const priority =
-        document.getElementById(
-          "task-priority"
-        ).value;
-
-      const deadline =
-        document.getElementById(
-          "task-deadline"
-        ).value;
-
-      const description =
-        document
-          .getElementById(
-            "task-description"
-          )
-          .value
-          .trim();
-
-      if (
-        !title ||
-        !assignee ||
-        !deadline
-      ) {
-
-        showToast(
-          "Please fill in title, assignee, and deadline"
-        );
-
+    if (!select) {
+        console.error("assign-user select not found");
         return;
-      }
+    }
 
-      adminTasks.unshift({
-        id: "t" + Date.now(),
-        title,
-        assignedTo: assignee,
-        assignedBy: session.name,
-        deadline,
-        priority,
-        status: "Pending",
-        description,
-      });
+    try {
 
-      saveTasks(adminTasks);
+        console.log("Loading members...");
 
-      renderAdminView();
+        const response = await fetch("/api/admin/members");
 
-      e.target.reset();
+        const members = await response.json();
 
-      showToast(
-        "Task allocated to " + assignee
-      );
-    });
+        console.log("Members received:", members);
 
-  document
-    .getElementById(
-      "admin-task-table-body"
-    )
-    .addEventListener("click", (e) => {
 
-      const viewId =
-        e.target
-          .closest("[data-view]")
-          ?.getAttribute("data-view");
+        if (!response.ok) {
 
-      const editId =
-        e.target
-          .closest("[data-edit]")
-          ?.getAttribute("data-edit");
-
-      const delId =
-        e.target
-          .closest("[data-delete]")
-          ?.getAttribute("data-delete");
-
-      if (viewId) {
-        openAdminViewModal(viewId);
-      }
-
-      if (editId) {
-        openAdminEditModal(editId);
-      }
-
-      if (delId) {
-        openAdminDeleteModal(delId);
-      }
-    });
-}
-
-function renderAdminView() {
-
-  const session =
-    getSession() || {
-      name: "Alex Morgan",
-      role: "Administrator",
-      initials: "AM"
-    };
-
-  document.getElementById(
-    "admin-name"
-  ).textContent = session.name;
-
-  document.getElementById(
-    "admin-avatar"
-  ).textContent = session.initials;
-
-  document.getElementById(
-    "admin-welcome-name"
-  ).textContent =
-    session.name.split(" ")[0];
-
-  document.getElementById(
-    "admin-today-label"
-  ).textContent = todayLabel();
-
-  adminTasks = loadTasks();
-
-  renderAdminStats();
-
-  renderAdminTable();
-
-  populateAssigneeSelect();
-}
-
-function renderAdminStats() {
-
-  const total =
-    adminTasks.length;
-
-  const completed =
-    adminTasks.filter(
-      (t) => t.status === "Completed"
-    ).length;
-
-  const pending =
-    adminTasks.filter(
-      (t) => t.status === "Pending"
-    ).length;
-
-  const overdue =
-    adminTasks.filter(
-      (t) => t.status === "Overdue"
-    ).length;
-
-  document.getElementById(
-    "stat-total"
-  ).textContent = total;
-
-  document.getElementById(
-    "stat-completed"
-  ).textContent = completed;
-
-  document.getElementById(
-    "stat-pending"
-  ).textContent = pending;
-
-  document.getElementById(
-    "stat-overdue"
-  ).textContent = overdue;
-
-  document.getElementById(
-    "stat-completed-rate"
-  ).textContent =
-    total
-      ? ((completed / total) * 100).toFixed(1) +
-        "% completion rate"
-      : "0% completion rate";
-
-  document.getElementById(
-    "stat-pending-rate"
-  ).textContent =
-    total
-      ? ((pending / total) * 100).toFixed(1) +
-        "% of total tasks"
-      : "0% of total tasks";
-}
-
-function renderAdminTable() {
-
-  const tbody =
-    document.getElementById(
-      "admin-task-table-body"
-    );
-
-  tbody.innerHTML = "";
-
-  if (!adminTasks.length) {
-
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6">
-          <div class="empty-state">
-            No tasks yet. Allocate one using the form on the right.
-          </div>
-        </td>
-      </tr>
-    `;
-
-    return;
-  }
-
-  adminTasks.forEach((task) => {
-
-    const tr =
-      document.createElement("tr");
-
-    tr.innerHTML = `
-      <td>${task.title}</td>
-
-      <td>
-        <div class="person-cell">
-          <span class="avatar">
-            ${initials(task.assignedTo)}
-          </span>
-
-          <span>
-            ${task.assignedTo}
-          </span>
-        </div>
-      </td>
-
-      <td>
-        ${formatDate(task.deadline)}
-      </td>
-
-      <td>
-        <span class="chip ${priorityClass(
-          task.priority
-        )}">
-          ${task.priority}
-        </span>
-      </td>
-
-      <td>
-        <span class="chip ${statusClass(
-          task.status
-        )}">
-          ${task.status}
-        </span>
-      </td>
-
-      <td>
-        <div class="action-cell">
-
-          <button
-            class="icon-action view"
-            data-view="${task.id}"
-            title="View"
-            aria-label="View task"
-          >
-            ${ICONS.eye}
-          </button>
-
-          <button
-            class="icon-action edit"
-            data-edit="${task.id}"
-            title="Edit"
-            aria-label="Edit task"
-          >
-            ${ICONS.edit}
-          </button>
-
-          <button
-            class="icon-action delete"
-            data-delete="${task.id}"
-            title="Delete"
-            aria-label="Delete task"
-          >
-            ${ICONS.trash}
-          </button>
-
-        </div>
-      </td>
-    `;
-
-    tbody.appendChild(tr);
-  });
-}
-
-function populateAssigneeSelect() {
-
-  const select =
-    document.getElementById(
-      "assign-user"
-    );
-
-  const people =
-    Array.from(
-      new Set(
-        adminTasks.map(
-          (t) => t.assignedTo
-        )
-      )
-    ).concat([
-      "Sara Chen",
-      "James Park",
-      "Priya Nair",
-      "Diego Alvarez",
-    ]);
-
-  const unique =
-    Array.from(new Set(people));
-
-  const current =
-    select.value;
-
-  select.innerHTML =
-    `<option value="" disabled selected>Select team member</option>`;
-
-  unique.forEach((name) => {
-
-    const opt =
-      document.createElement(
-        "option"
-      );
-
-    opt.value = name;
-    opt.textContent = name;
-
-    select.appendChild(opt);
-  });
-
-  if (unique.includes(current)) {
-    select.value = current;
-  }
-}
-
-function openAdminViewModal(id) {
-
-  const modal =
-    document.getElementById(
-      "task-modal"
-    );
-
-  const task =
-    adminTasks.find(
-      (t) => t.id === id
-    );
-
-  if (!task) return;
-
-  modal
-    .querySelector("#modal-title")
-    .textContent = task.title;
-
-  modal
-    .querySelector("#modal-body")
-    .innerHTML = `
-      <div class="chip-row">
-
-        <span class="chip ${priorityClass(
-          task.priority
-        )}">
-          ${task.priority}
-        </span>
-
-        <span class="chip ${statusClass(
-          task.status
-        )}">
-          ${task.status}
-        </span>
-
-      </div>
-
-      <div class="desc-box">
-        <span class="label-caps">
-          Description
-        </span>
-
-        ${task.description ||
-          "No description provided."}
-      </div>
-
-      <div class="meta-grid">
-
-        <div class="meta-box">
-          <span class="label-caps">
-            Assigned to
-          </span>
-
-          <span class="value">
-            ${task.assignedTo}
-          </span>
-        </div>
-
-        <div class="meta-box">
-          <span class="label-caps">
-            Deadline
-          </span>
-
-          <span class="value">
-            ${formatDate(
-              task.deadline
-            )}
-          </span>
-        </div>
-
-      </div>
-    `;
-
-  modal
-    .querySelector("#modal-actions")
-    .innerHTML = `
-      <button
-        class="btn btn-outline"
-        id="modal-close-btn"
-      >
-        Close
-      </button>
-    `;
-
-  modal.classList.add("visible");
-
-  modal
-    .querySelector(
-      "#modal-close-btn"
-    )
-    .addEventListener(
-      "click",
-      closeAdminModal
-    );
-}
-
-function openAdminEditModal(id) {
-
-  const modal =
-    document.getElementById(
-      "task-modal"
-    );
-
-  const task =
-    adminTasks.find(
-      (t) => t.id === id
-    );
-
-  if (!task) return;
-
-  modal
-    .querySelector("#modal-title")
-    .textContent = "Edit Task";
-
-  modal
-    .querySelector("#modal-body")
-    .innerHTML = `
-      <div class="field">
-
-        <label for="edit-title">
-          Task Title
-        </label>
-
-        <input
-          type="text"
-          id="edit-title"
-          value="${escapeAttr(
-            task.title
-          )}"
-        >
-
-      </div>
-
-      <div class="field-grid-2">
-
-        <div class="field">
-
-          <label for="edit-priority">
-            Priority
-          </label>
-
-          <select id="edit-priority">
-
-            ${[
-              "Low",
-              "Medium",
-              "High",
-              "Critical",
-            ]
-              .map(
-                (p) =>
-                  `<option value="${p}" ${
-                    p === task.priority
-                      ? "selected"
-                      : ""
-                  }>
-                    ${p}
-                  </option>`
-              )
-              .join("")}
-
-          </select>
-
-        </div>
-
-        <div class="field">
-
-          <label for="edit-status">
-            Status
-          </label>
-
-          <select id="edit-status">
-
-            ${[
-              "Pending",
-              "In Progress",
-              "Completed",
-              "Overdue",
-            ]
-              .map(
-                (s) =>
-                  `<option value="${s}" ${
-                    s === task.status
-                      ? "selected"
-                      : ""
-                  }>
-                    ${s}
-                  </option>`
-              )
-              .join("")}
-
-          </select>
-
-        </div>
-
-      </div>
-
-      <div class="field">
-
-        <label for="edit-deadline">
-          Deadline
-        </label>
-
-        <input
-          type="date"
-          id="edit-deadline"
-          value="${task.deadline}"
-        >
-
-      </div>
-    `;
-
-  modal
-    .querySelector("#modal-actions")
-    .innerHTML = `
-      <button
-        class="btn btn-outline"
-        id="modal-cancel-btn"
-      >
-        Cancel
-      </button>
-
-      <button
-        class="btn btn-primary small"
-        id="modal-save-btn"
-      >
-        Save Changes
-      </button>
-    `;
-
-  modal.classList.add("visible");
-
-  modal
-    .querySelector(
-      "#modal-cancel-btn"
-    )
-    .addEventListener(
-      "click",
-      closeAdminModal
-    );
-
-  modal
-    .querySelector(
-      "#modal-save-btn"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        task.title =
-          document
-            .getElementById(
-              "edit-title"
-            )
-            .value
-            .trim() ||
-          task.title;
-
-        task.priority =
-          document.getElementById(
-            "edit-priority"
-          ).value;
-
-        task.status =
-          document.getElementById(
-            "edit-status"
-          ).value;
-
-        task.deadline =
-          document.getElementById(
-            "edit-deadline"
-          ).value;
-
-        saveTasks(adminTasks);
-
-        renderAdminStats();
-
-        renderAdminTable();
-
-        closeAdminModal();
-
-        showToast(
-          "Task updated"
-        );
-      }
-    );
-}
-
-function openAdminDeleteModal(id) {
-
-  const modal =
-    document.getElementById(
-      "task-modal"
-    );
-
-  const task =
-    adminTasks.find(
-      (t) => t.id === id
-    );
-
-  if (!task) return;
-
-  modal
-    .querySelector("#modal-title")
-    .textContent = "Delete Task";
-
-  modal
-    .querySelector("#modal-body")
-    .innerHTML = `
-      <p
-        style="
-          color: var(--ink-700);
-          margin: 0;
-        "
-      >
-        Delete
-        "<strong>${task.title}</strong>"
-        assigned to
-        ${task.assignedTo}?
-        This can't be undone.
-      </p>
-    `;
-
-  modal
-    .querySelector("#modal-actions")
-    .innerHTML = `
-      <button
-        class="btn btn-outline"
-        id="modal-cancel-btn"
-      >
-        Cancel
-      </button>
-
-      <button
-        class="btn btn-primary small"
-        id="modal-delete-btn"
-        style="background: var(--red-600);"
-      >
-        Delete
-      </button>
-    `;
-
-  modal.classList.add("visible");
-
-  modal
-    .querySelector(
-      "#modal-cancel-btn"
-    )
-    .addEventListener(
-      "click",
-      closeAdminModal
-    );
-
-  modal
-    .querySelector(
-      "#modal-delete-btn"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        adminTasks =
-          adminTasks.filter(
-            (t) => t.id !== id
-          );
-
-        saveTasks(adminTasks);
-
-        renderAdminStats();
-
-        renderAdminTable();
-
-        closeAdminModal();
-
-        showToast(
-          "Task deleted"
-        );
-      }
-    );
-}
-
-function closeAdminModal() {
-
-  document
-    .getElementById(
-      "task-modal"
-    )
-    .classList.remove("visible");
-}
-
-/* ============================================
-   TEAM MEMBER VIEW
-   ============================================ */
-
-let memberTasks = [];
-let memberSelectedId = null;
-
-function wireMemberView() {
-
-  document
-    .getElementById(
-      "member-logout-btn"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        clearSession();
-
-        window.location.href =
-          "index.html";
-      }
-    );
-
-  document
-    .getElementById(
-      "member-task-table-body"
-    )
-    .addEventListener(
-      "click",
-      (e) => {
-
-        const id =
-          e.target
-            .closest(
-              "[data-select]"
-            )
-            ?.getAttribute(
-              "data-select"
+            throw new Error(
+                members.message || "Failed to load members"
             );
-
-        if (!id) return;
-
-        memberSelectedId = id;
-
-        renderMemberTable();
-
-        renderMemberDetails();
-      }
-    );
-
-  document
-    .getElementById(
-      "update-form"
-    )
-    .addEventListener(
-      "submit",
-      (e) => {
-
-        e.preventDefault();
-
-        const input =
-          document.getElementById(
-            "update-text"
-          );
-
-        const text =
-          input.value.trim();
-
-        if (!text) {
-
-          showToast(
-            "Write an update before submitting"
-          );
-
-          return;
         }
 
-        input.value = "";
 
-        showToast(
-          "Update submitted"
+        // Clear current options
+
+        select.innerHTML = "";
+
+        // Default option
+
+        const defaultOption =
+            document.createElement("option");
+
+        defaultOption.value = "";
+        defaultOption.textContent =
+            "Select team member";
+        defaultOption.disabled = true;
+        defaultOption.selected = true;
+
+        select.appendChild(defaultOption);
+
+
+        // No members
+
+        if (members.length === 0) {
+
+            const option =
+                document.createElement("option");
+
+            option.value = "";
+            option.textContent =
+                "No active members found";
+
+            option.disabled = true;
+
+            select.appendChild(option);
+
+            return;
+        }
+
+
+        // Add members
+
+        members.forEach(member => {
+
+            const option =
+                document.createElement("option");
+
+            option.value = member._id;
+
+            option.textContent =
+                `${member.name} (${member.email})`;
+
+            select.appendChild(option);
+        });
+
+
+        console.log(
+            `${members.length} members loaded`
         );
-      }
+
+    } catch (error) {
+
+        console.error(
+            "Error loading members:",
+            error
+        );
+
+        select.innerHTML = "";
+
+        const option =
+            document.createElement("option");
+
+        option.textContent =
+            "Failed to load members";
+
+        option.disabled = true;
+
+        select.appendChild(option);
+    }
+}
+
+
+// =====================================================
+// ADMIN - LOAD DASHBOARD
+// =====================================================
+
+async function loadDashboard() {
+
+    try {
+
+        const response =
+            await fetch("/api/admin/dashboard");
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message ||
+                "Failed to load dashboard"
+            );
+        }
+
+
+        const total =
+            document.getElementById("stat-total");
+
+        const completed =
+            document.getElementById("stat-completed");
+
+        const pending =
+            document.getElementById("stat-pending");
+
+        const overdue =
+            document.getElementById("stat-overdue");
+
+
+        if (total) {
+            total.textContent =
+                data.totalTasks;
+        }
+
+        if (completed) {
+            completed.textContent =
+                data.completedTasks;
+        }
+
+        if (pending) {
+            pending.textContent =
+                data.pendingTasks;
+        }
+
+        if (overdue) {
+            overdue.textContent =
+                data.overdueTasks;
+        }
+
+
+        // Completion percentage
+
+        const completedRate =
+            document.getElementById(
+                "stat-completed-rate"
+            );
+
+        if (completedRate) {
+
+            const rate =
+                data.totalTasks > 0
+                    ? Math.round(
+                        (data.completedTasks /
+                            data.totalTasks) *
+                        100
+                    )
+                    : 0;
+
+            completedRate.textContent =
+                `${rate}% completion rate`;
+        }
+
+
+        // Pending percentage
+
+        const pendingRate =
+            document.getElementById(
+                "stat-pending-rate"
+            );
+
+        if (pendingRate) {
+
+            const rate =
+                data.totalTasks > 0
+                    ? Math.round(
+                        (data.pendingTasks /
+                            data.totalTasks) *
+                        100
+                    )
+                    : 0;
+
+            pendingRate.textContent =
+                `${rate}% of total tasks`;
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Dashboard loading error:",
+            error
+        );
+    }
+}
+
+
+// =====================================================
+// ADMIN - LOAD TASKS
+// =====================================================
+
+async function loadAdminTasks() {
+
+    const tableBody =
+        document.getElementById(
+            "admin-task-table-body"
+        );
+
+    if (!tableBody) {
+        return;
+    }
+
+    try {
+
+        const response =
+            await fetch("/api/admin/tasks");
+
+        const tasks =
+            await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                tasks.message ||
+                "Failed to load tasks"
+            );
+        }
+
+
+        tableBody.innerHTML = "";
+
+
+        if (tasks.length === 0) {
+
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6">
+                        No tasks found
+                    </td>
+                </tr>
+            `;
+
+            return;
+        }
+
+
+        tasks.forEach(task => {
+
+            const row =
+                document.createElement("tr");
+
+
+            const assignedName =
+                task.assignedTo
+                    ? task.assignedTo.name
+                    : "Not assigned";
+
+
+            const deadline =
+                task.deadline
+                    ? new Date(
+                        task.deadline
+                    ).toLocaleDateString()
+                    : "-";
+
+
+            row.innerHTML = `
+
+                <td>
+                    ${escapeHtml(task.title)}
+                </td>
+
+                <td>
+                    ${escapeHtml(assignedName)}
+                </td>
+
+                <td>
+                    ${deadline}
+                </td>
+
+                <td>
+                    ${escapeHtml(
+                        task.priority || "-"
+                    )}
+                </td>
+
+                <td>
+                    ${escapeHtml(
+                        task.status || "pending"
+                    )}
+                </td>
+
+                <td>
+                    <button
+                        class="delete-task-btn"
+                        data-id="${task._id}"
+                    >
+                        Delete
+                    </button>
+                </td>
+
+            `;
+
+            tableBody.appendChild(row);
+        });
+
+
+        // Delete buttons
+
+        document
+            .querySelectorAll(".delete-task-btn")
+            .forEach(button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        deleteTask(
+                            button.dataset.id
+                        );
+
+                    }
+                );
+
+            });
+
+    } catch (error) {
+
+        console.error(
+            "Error loading tasks:",
+            error
+        );
+    }
+}
+
+
+// =====================================================
+// ADMIN - CREATE TASK
+// =====================================================
+
+function setupTaskForm() {
+
+    const form =
+        document.getElementById(
+            "allocate-form"
+        );
+
+    if (!form) {
+        return;
+    }
+
+
+    form.addEventListener(
+        "submit",
+        async event => {
+
+            event.preventDefault();
+
+
+            const title =
+                document.getElementById(
+                    "task-title"
+                ).value.trim();
+
+
+            const assignedTo =
+                document.getElementById(
+                    "assign-user"
+                ).value;
+
+
+            const priority =
+                document.getElementById(
+                    "task-priority"
+                ).value.toLowerCase();
+
+
+            const deadline =
+                document.getElementById(
+                    "task-deadline"
+                ).value;
+
+
+            const description =
+                document.getElementById(
+                    "task-description"
+                ).value.trim();
+
+
+            const user =
+                getLoggedInUser();
+
+
+            // ==========================================
+            // VALIDATION
+            // ==========================================
+
+            if (!title) {
+                alert("Please enter task title.");
+                return;
+            }
+
+            if (!assignedTo) {
+                alert("Please select a team member.");
+                return;
+            }
+
+            if (!deadline) {
+                alert("Please select a deadline.");
+                return;
+            }
+
+            if (!user || user.role !== "admin") {
+
+                alert(
+                    "Admin login information not found."
+                );
+
+                return;
+            }
+
+
+            // ==========================================
+            // CREATE TASK
+            // ==========================================
+
+            try {
+
+                const response =
+                    await fetch(
+                        "/api/admin/tasks",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body: JSON.stringify({
+
+                                title,
+
+                                description,
+
+                                assignedTo,
+
+                                createdBy:
+                                    user.id,
+
+                                priority,
+
+                                deadline
+
+                            })
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!response.ok) {
+
+                    alert(
+                        data.message ||
+                        "Failed to create task."
+                    );
+
+                    return;
+                }
+
+
+                alert(
+                    "Task allocated successfully!"
+                );
+
+
+                // Clear form
+
+                form.reset();
+
+
+                // Reload data
+
+                await loadAdminTasks();
+
+                await loadDashboard();
+
+            } catch (error) {
+
+                console.error(
+                    "Create task error:",
+                    error
+                );
+
+                alert(
+                    "Unable to connect to server."
+                );
+            }
+
+        }
     );
 }
 
-function renderMemberView() {
 
-  const session =
-    getSession() || {
-      name: "Sara Chen",
-      role: "Team Member",
-      initials: "SC"
-    };
+// =====================================================
+// ADMIN - DELETE TASK
+// =====================================================
 
-  document.getElementById(
-    "member-name"
-  ).textContent =
-    session.name;
+async function deleteTask(taskId) {
 
-  document.getElementById(
-    "member-avatar"
-  ).textContent =
-    session.initials;
+    const confirmDelete =
+        confirm(
+            "Are you sure you want to delete this task?"
+        );
 
-  document.getElementById(
-    "member-today-label"
-  ).textContent =
-    todayLabel();
+    if (!confirmDelete) {
+        return;
+    }
 
-  const allTasks =
-    loadTasks();
 
-  memberTasks =
-    allTasks.filter(
-      (t) =>
-        t.assignedTo ===
-        session.name
-    );
+    try {
 
-  memberSelectedId =
-    memberTasks[0]
-      ? memberTasks[0].id
-      : null;
+        const response =
+            await fetch(
+                `/api/admin/tasks/${taskId}`,
+                {
+                    method: "DELETE"
+                }
+            );
 
-  renderMemberHead();
 
-  renderMemberTable();
+        const data =
+            await response.json();
 
-  renderMemberDetails();
+
+        if (!response.ok) {
+
+            alert(
+                data.message ||
+                "Failed to delete task."
+            );
+
+            return;
+        }
+
+
+        alert(
+            "Task deleted successfully."
+        );
+
+
+        await loadAdminTasks();
+
+        await loadDashboard();
+
+    } catch (error) {
+
+        console.error(
+            "Delete task error:",
+            error
+        );
+
+        alert(
+            "Unable to connect to server."
+        );
+    }
 }
 
-function renderMemberHead() {
 
-  document.getElementById(
-    "task-count"
-  ).textContent =
-    memberTasks.length;
+// =====================================================
+// ADMIN LOGOUT
+// =====================================================
 
-  const inProgress =
-    memberTasks.filter(
-      (t) =>
-        t.status === "In Progress"
-    ).length;
+function setupAdminLogout() {
 
-  const pending =
-    memberTasks.filter(
-      (t) =>
-        t.status === "Pending"
-    ).length;
+    const logoutButton =
+        document.getElementById(
+            "admin-logout-btn"
+        );
 
-  document.getElementById(
-    "badge-inprogress"
-  ).textContent =
-    inProgress +
-    " in progress";
+    if (!logoutButton) {
+        return;
+    }
 
-  document.getElementById(
-    "badge-pending"
-  ).textContent =
-    pending +
-    " pending";
-}
 
-function renderMemberTable() {
+    logoutButton.addEventListener(
+        "click",
+        () => {
 
-  const tbody =
-    document.getElementById(
-      "member-task-table-body"
+            localStorage.removeItem(
+                "taskflow_token"
+            );
+
+            localStorage.removeItem(
+                "taskflow_user"
+            );
+
+            window.location.href = "/";
+        }
     );
 
-  tbody.innerHTML = "";
 
-  if (!memberTasks.length) {
+    // Display admin name
 
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6">
-          <div class="empty-state">
-            No tasks assigned to you yet.
-          </div>
-        </td>
-      </tr>
-    `;
+    const user =
+        getLoggedInUser();
 
-    return;
-  }
 
-  memberTasks.forEach((task) => {
+    if (user) {
 
-    const tr =
-      document.createElement("tr");
+        const adminName =
+            document.getElementById(
+                "admin-name"
+            );
 
-    tr.className =
-      task.id === memberSelectedId
-        ? "row-selected"
-        : "";
+        const welcomeName =
+            document.getElementById(
+                "admin-welcome-name"
+            );
 
-    tr.innerHTML = `
-      <td>
-        ${task.title}
-      </td>
+        const avatar =
+            document.getElementById(
+                "admin-avatar"
+            );
 
-      <td>
-        Admin (${task.assignedBy})
-      </td>
 
-      <td>
-        ${formatDate(task.deadline)}
-      </td>
+        if (adminName) {
+            adminName.textContent =
+                user.name;
+        }
 
-      <td>
-        <span class="chip ${priorityClass(
-          task.priority
-        )}">
-          ${task.priority}
-        </span>
-      </td>
+        if (welcomeName) {
+            welcomeName.textContent =
+                user.name.split(" ")[0];
+        }
 
-      <td>
-        <span class="chip ${statusClass(
-          task.status
-        )}">
-          ${task.status}
-        </span>
-      </td>
+        if (avatar) {
 
-      <td>
+            const parts =
+                user.name
+                    .trim()
+                    .split(" ");
 
-        <button
-          class="link-action"
-          data-select="${task.id}"
-        >
-          ${ICONS.eyeSmall}
-          View
-        </button>
+            let initials =
+                parts[0]
+                    ? parts[0][0]
+                    : "";
 
-      </td>
-    `;
+            if (parts.length > 1) {
 
-    tbody.appendChild(tr);
-  });
+                initials +=
+                    parts[
+                        parts.length - 1
+                    ][0];
+            }
+
+            avatar.textContent =
+                initials.toUpperCase();
+        }
+    }
 }
 
-function renderMemberDetails() {
 
-  const panel =
-    document.getElementById(
-      "details-panel"
+// =====================================================
+// MEMBER PAGE
+// =====================================================
+
+async function loadMemberPage() {
+
+    const user =
+        getLoggedInUser();
+
+    if (!user || user.role !== "member") {
+
+        window.location.href = "/";
+
+        return;
+    }
+
+
+    console.log(
+        "Logged in member:",
+        user
     );
 
-  const task =
-    memberTasks.find(
-      (t) =>
-        t.id ===
-        memberSelectedId
-    );
 
-  if (!task) {
+    // If your member page has an element
+    // with id="member-name"
 
-    panel.innerHTML = `
-      <div class="empty-state">
-        Select a task to view its details.
-      </div>
-    `;
+    const memberName =
+        document.getElementById(
+            "member-name"
+        );
 
-    document.getElementById(
-      "update-panel"
-    ).style.display = "none";
+    if (memberName) {
+        memberName.textContent =
+            user.name;
+    }
 
-    return;
-  }
 
-  document.getElementById(
-    "update-panel"
-  ).style.display = "";
+    try {
 
-  panel.innerHTML = `
-    <h3
-      style="
-        margin: 0 0 12px;
-        font-size: 1.05rem;
-      "
-    >
-      ${task.title}
-    </h3>
+        const response =
+            await fetch(
+                `/api/member/tasks/${user.id}`
+            );
 
-    <div class="chip-row">
 
-      <span class="chip ${priorityClass(
-        task.priority
-      )}">
-        ${task.priority}
-      </span>
+        const data =
+            await response.json();
 
-      <span class="chip ${statusClass(
-        task.status
-      )}">
-        ${task.status}
-      </span>
 
-    </div>
+        if (!response.ok) {
 
-    <div class="desc-box">
+            console.error(
+                data.message
+            );
 
-      <span class="label-caps">
-        Description
-      </span>
+            return;
+        }
 
-      ${task.description ||
-        "No description provided."}
 
-    </div>
+        console.log(
+            "Member tasks:",
+            data.tasks
+        );
 
-    <div class="meta-grid">
 
-      <div class="meta-box">
+        // You can render member tasks here
+        // based on your member.html structure.
 
-        <span class="label-caps">
-          Assigned By
-        </span>
+    } catch (error) {
 
-        <span class="value">
-          ${task.assignedBy}
-        </span>
-
-      </div>
-
-      <div class="meta-box">
-
-        <span class="label-caps">
-          Deadline
-        </span>
-
-        <span class="value">
-          ${formatDate(
-            task.deadline
-          )}
-        </span>
-
-      </div>
-
-    </div>
-  `;
+        console.error(
+            "Member task error:",
+            error
+        );
+    }
 }
 
-/* ============================================
-   START APPLICATION
-   ============================================ */
 
-// document.addEventListener(
-//   "DOMContentLoaded",
-//   initApp
-// );
+// =====================================================
+// MEMBER LOGOUT
+// =====================================================
+
+function setupMemberLogout() {
+
+    const logoutButton =
+        document.getElementById(
+            "member-logout-btn"
+        );
+
+    if (!logoutButton) {
+        return;
+    }
+
+
+    logoutButton.addEventListener(
+        "click",
+        () => {
+
+            localStorage.removeItem(
+                "taskflow_token"
+            );
+
+            localStorage.removeItem(
+                "taskflow_user"
+            );
+
+            window.location.href = "/";
+        }
+    );
+}
+
+
+// =====================================================
+// HTML ESCAPE
+// =====================================================
+
+function escapeHtml(value) {
+
+    if (value === null ||
+        value === undefined) {
+
+        return "";
+    }
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}

@@ -1,27 +1,60 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
+
 const memberRoutes = require("./routes/memberRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const authRoutes = require("./routes/authRoutes");
 
 const app = express();
+
+// ===============================
+// Middleware
+// ===============================
 
 app.use(cors());
 app.use(express.json());
 
-// Serve Frontend files
-app.use(express.static(path.join(__dirname, "../Frontend")));
+// ===============================
+// Serve Frontend
+// ===============================
 
-// Connect MongoDB
+app.use(
+    express.static(
+        path.join(__dirname, "../Frontend")
+    )
+);
+
+// ===============================
+// Database
+// ===============================
+
 connectDB();
 
-// Login / Home page
+// ===============================
+// API Routes
+// ===============================
+
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/member", memberRoutes);
+
+// ===============================
+// Login Page
+// ===============================
+
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "../Frontend/index.html"));
+    res.sendFile(
+        path.join(__dirname, "../Frontend/index.html")
+    );
 });
 
-app.use("/api/member", memberRoutes);
+// ===============================
+// Server
+// ===============================
 
 const PORT = process.env.PORT || 5000;
 
