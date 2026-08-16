@@ -52,7 +52,10 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Member page detected");
 
         loadMemberPage();
+
         setupMemberLogout();
+
+        setupMemberUpdate();
     }
 
 });
@@ -197,6 +200,46 @@ function getLoggedInUser() {
 // =====================================================
 // ADMIN - LOAD MEMBERS
 // =====================================================
+
+const API_BASE_URL = "/api";
+
+async function apiRequest(endpoint, options = {}) {
+
+    const token = getToken();
+
+    const response = await fetch(
+        `${API_BASE_URL}${endpoint}`,
+        {
+            ...options,
+
+            headers: {
+                "Content-Type": "application/json",
+
+                ...(token
+                    ? {
+                        Authorization:
+                            `Bearer ${token}`
+                    }
+                    : {}),
+
+                ...(options.headers || {})
+            }
+        }
+    );
+
+    const data =
+        await response.json();
+
+    if (!response.ok) {
+
+        throw new Error(
+            data.message ||
+            "Request failed"
+        );
+    }
+
+    return data;
+}loadMemberPage
 
 async function loadAdminMembers() {
 
@@ -893,7 +936,14 @@ async function loadMemberPage() {
     const user =
         getLoggedInUser();
 
+
+    // -----------------------------------------
+    // Check login
+    // -----------------------------------------
+
     if (!user || user.role !== "member") {
+
+        clearSession();
 
         window.location.href = "/";
 
@@ -907,13 +957,25 @@ async function loadMemberPage() {
     );
 
 
-    // If your member page has an element
-    // with id="member-name"
+    // -----------------------------------------
+    // Header information
+    // -----------------------------------------
 
     const memberName =
         document.getElementById(
             "member-name"
         );
+
+    const memberAvatar =
+        document.getElementById(
+            "member-avatar"
+        );
+
+    const today =
+        document.getElementById(
+            "member-today-label"
+        );
+
 
     if (memberName) {
         memberName.textContent =
@@ -921,26 +983,45 @@ async function loadMemberPage() {
     }
 
 
+    if (memberAvatar) {
+
+        const parts =
+            user.name
+                .trim()
+                .split(" ");
+
+        let initials =
+            parts[0]
+                ? parts[0][0]
+                : "";
+
+        if (parts.length > 1) {
+
+            initials +=
+                parts[parts.length - 1][0];
+        }
+
+        memberAvatar.textContent =
+            initials.toUpperCase();
+    }
+
+
+    if (today) {
+        today.textContent =
+            todayLabel();
+    }
+
+
+    // -----------------------------------------
+    // Load tasks from MongoDB
+    // -----------------------------------------
+
     try {
 
-        const response =
-            await fetch(
-                `/api/member/tasks/${user.id}`
-            );
-
-
         const data =
-            await response.json();
-
-
-        if (!response.ok) {
-
-            console.error(
-                data.message
+            await apiRequest(
+                "/member/tasks"
             );
-
-            return;
-        }
 
 
         console.log(
@@ -949,8 +1030,10 @@ async function loadMemberPage() {
         );
 
 
-        // You can render member tasks here
-        // based on your member.html structure.
+        renderMemberTasks(
+            data.tasks || []
+        );
+
 
     } catch (error) {
 
@@ -958,7 +1041,739 @@ async function loadMemberPage() {
             "Member task error:",
             error
         );
+
+
+        showToast(
+            error.message ||
+            "Unable to load your tasks"
+        );
     }
+}
+
+function formatPriority(priority) {
+
+    if (!priority) {
+        return "Medium";
+    }
+
+    return priority
+        .charAt(0)
+        .toUpperCase()
+        + priority.slice(1);
+}
+
+
+function formatStatus(status) {
+
+    if (!status) {
+        return "Pending";
+    }
+
+    return status
+        .split("_")
+        .map(word =>
+            word
+                .charAt(0)
+                .toUpperCase()
+            + word.slice(1)
+        )
+        .join(" ");
+}
+
+
+function priorityClass(priority) {
+
+    return "priority-" +
+        priority
+            .toLowerCase();
+}
+
+
+function statusClass(status) {
+
+    return "status-" +
+        status
+            .toLowerCase()
+            .replace(/\s+/g, "");
+}
+
+function updateMemberStats(tasks) {
+
+    const count =
+        document.getElementById(
+            "task-count"
+        );
+
+    const inProgress =
+        document.getElementById(
+            "badge-inprogress"
+        );
+
+    const pending =
+        document.getElementById(
+            "badge-pending"
+        );
+
+
+    const progressCount =
+        tasks.filter(
+            task =>
+                task.status ===
+                "in_progress"
+        ).length;
+
+
+    const pendingCount =
+        tasks.filter(
+            task =>
+                task.status ===
+                "pending"
+        ).length;
+
+
+    if (count) {
+        count.textContent =
+            tasks.length;
+    }
+
+
+    if (inProgress) {
+        inProgress.textContent =
+            `${progressCount} in progress`;
+    }
+
+
+    if (pending) {
+        pending.textContent =
+            `${pendingCount} pending`;
+    }
+}
+
+
+
+function renderTaskDetails(task) {
+
+    const panel =
+        document.getElementById("details-panel");
+
+
+    if (!panel || !task) {
+        return;
+    }
+
+
+    // ==========================================
+    // STORE SELECTED TASK
+    // ==========================================
+
+    window.selectedMemberTaskId =
+        task._id;
+
+
+    // ==========================================
+    // FORMAT DATA
+    // ==========================================
+
+    const priority =
+        formatPriority(task.priority);
+
+
+    const status =
+        formatStatus(task.status);
+
+
+    const assignedBy =
+        task.createdBy
+            ? task.createdBy.name
+            : "Admin";
+
+
+    const deadline =
+        task.deadline
+            ? new Date(task.deadline)
+                .toLocaleDateString(
+                    "en-US",
+                    {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric"
+                    }
+                )
+            : "-";
+
+
+    // ==========================================
+    // DISPLAY TASK DETAILS
+    // ==========================================
+
+    panel.innerHTML = `
+
+        <h3
+            style="
+                margin: 0 0 12px;
+                font-size: 1.05rem;
+            "
+        >
+            ${escapeHtml(task.title)}
+        </h3>
+
+
+        <div class="chip-row">
+
+            <span class="chip ${priorityClass(priority)}">
+                ${escapeHtml(priority)}
+            </span>
+
+            <span class="chip ${statusClass(status)}">
+                ${escapeHtml(status)}
+            </span>
+
+        </div>
+
+
+        <div class="desc-box">
+
+            <span class="label-caps">
+                Description
+            </span>
+
+            ${escapeHtml(
+                task.description ||
+                "No description provided."
+            )}
+
+        </div>
+
+
+        <div class="meta-grid">
+
+            <div class="meta-box">
+
+                <span class="label-caps">
+                    Assigned By
+                </span>
+
+                <span class="value">
+                    ${escapeHtml(assignedBy)}
+                </span>
+
+            </div>
+
+
+            <div class="meta-box">
+
+                <span class="label-caps">
+                    Deadline
+                </span>
+
+                <span class="value">
+                    ${deadline}
+                </span>
+
+            </div>
+
+        </div>
+
+
+        ${
+            task.updateDescription
+                ? `
+                    <div class="desc-box">
+
+                        <span class="label-caps">
+                            Latest Update
+                        </span>
+
+                        ${escapeHtml(
+                            task.updateDescription
+                        )}
+
+                    </div>
+                `
+                : ""
+        }
+
+    `;
+
+
+    // ==========================================
+    // SHOW UPDATE PANEL
+    // ==========================================
+
+    const updatePanel =
+        document.getElementById("update-panel");
+
+
+    if (updatePanel) {
+        updatePanel.style.display = "";
+    }
+
+
+    // ==========================================
+    // SET CURRENT STATUS
+    // ==========================================
+
+    const statusSelect =
+        document.getElementById("update-status");
+
+
+    if (statusSelect) {
+
+        // Convert backend status directly
+
+        statusSelect.value =
+            task.status || "pending";
+    }
+
+
+    console.log(
+        "Task selected successfully:",
+        task._id
+    );
+}
+
+function setupMemberUpdate() {
+
+    const form =
+        document.getElementById(
+            "update-form"
+        );
+
+
+    if (!form) {
+        return;
+    }
+
+
+    form.addEventListener(
+        "submit",
+        async event => {
+
+            event.preventDefault();
+
+
+            // ==========================================
+            // GET SELECTED TASK
+            // ==========================================
+
+            const taskId =
+                window.selectedMemberTaskId;
+
+
+            if (!taskId) {
+
+                showToast(
+                    "Please select a task first."
+                );
+
+                return;
+            }
+
+
+            const status =
+                document.getElementById(
+                    "update-status"
+                ).value;
+
+
+            const updateDescription =
+                document.getElementById(
+                    "update-text"
+                ).value.trim();
+
+
+            if (!updateDescription) {
+
+                showToast(
+                    "Please enter your work update."
+                );
+
+                return;
+            }
+
+
+            console.log(
+                "Submitting update for task:",
+                taskId
+            );
+
+
+            try {
+
+                const data =
+                    await apiRequest(
+                        `/member/tasks/${taskId}/update`,
+                        {
+                            method: "PATCH",
+
+                            body: JSON.stringify({
+
+                                status:
+                                    status,
+
+                                updateDescription:
+                                    updateDescription
+                            })
+                        }
+                    );
+
+
+                console.log(
+                    "Updated task:",
+                    data.task
+                );
+
+
+                // Clear description
+
+                document.getElementById(
+                    "update-text"
+                ).value = "";
+
+
+                showToast(
+                    "Task update submitted successfully!"
+                );
+
+
+                // Keep same task selected
+
+                window.selectedMemberTaskId =
+                    data.task._id;
+
+
+                // Show updated details
+
+                renderTaskDetails(
+                    data.task
+                );
+
+
+                // Reload task list
+
+                const taskData =
+                    await apiRequest(
+                        "/member/tasks"
+                    );
+
+
+                renderMemberTasks(
+                    taskData.tasks || []
+                );
+
+
+            } catch (error) {
+
+                console.error(
+                    "Update submission error:",
+                    error
+                );
+
+
+                showToast(
+                    error.message ||
+                    "Failed to submit update"
+                );
+            }
+        }
+    );
+}
+
+function renderMemberTasks(tasks) {
+
+    const tableBody =
+        document.getElementById("member-task-table-body");
+
+    if (!tableBody) {
+        return;
+    }
+
+    tableBody.innerHTML = "";
+
+    updateMemberStats(tasks);
+
+
+    // ==========================================
+    // NO TASKS
+    // ==========================================
+
+    if (!tasks || tasks.length === 0) {
+
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6">
+                    <div class="empty-state">
+                        No tasks assigned to you yet.
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        // Clear details
+        const detailsPanel =
+            document.getElementById("details-panel");
+
+        if (detailsPanel) {
+            detailsPanel.innerHTML = `
+                <div class="empty-state">
+                    No task selected.
+                </div>
+            `;
+        }
+
+        // Hide update panel
+        const updatePanel =
+            document.getElementById("update-panel");
+
+        if (updatePanel) {
+            updatePanel.style.display = "none";
+        }
+
+        window.selectedMemberTaskId = null;
+
+        return;
+    }
+
+
+    // ==========================================
+    // CREATE TASK ROWS
+    // ==========================================
+
+    tasks.forEach(task => {
+
+        const row =
+            document.createElement("tr");
+
+
+        // Highlight selected task
+
+        if (
+            window.selectedMemberTaskId &&
+            window.selectedMemberTaskId === task._id
+        ) {
+            row.classList.add("selected-task");
+        }
+
+
+        const assignedBy =
+            task.createdBy
+                ? task.createdBy.name
+                : "Admin";
+
+
+        const priority =
+            formatPriority(task.priority);
+
+
+        const status =
+            formatStatus(task.status);
+
+
+        const deadline =
+            task.deadline
+                ? new Date(task.deadline)
+                    .toLocaleDateString(
+                        "en-US",
+                        {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric"
+                        }
+                    )
+                : "-";
+
+
+        row.innerHTML = `
+
+            <td>
+                ${escapeHtml(task.title)}
+            </td>
+
+            <td>
+                ${escapeHtml(assignedBy)}
+            </td>
+
+            <td>
+                ${deadline}
+            </td>
+
+            <td>
+                <span class="chip ${priorityClass(priority)}">
+                    ${escapeHtml(priority)}
+                </span>
+            </td>
+
+            <td>
+                <span class="chip ${statusClass(status)}">
+                    ${escapeHtml(status)}
+                </span>
+            </td>
+
+            <td>
+
+                <button
+                    type="button"
+                    class="link-action select-task-btn"
+                    data-task-id="${task._id}"
+                >
+                    View
+                </button>
+
+            </td>
+
+        `;
+
+
+        tableBody.appendChild(row);
+    });
+
+
+    // ==========================================
+    // SELECT TASK
+    // ==========================================
+
+    tableBody
+        .querySelectorAll(".select-task-btn")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    const taskId =
+                        button.dataset.taskId;
+
+
+                    // Find the task that was clicked
+
+                    const selectedTask =
+                        tasks.find(
+                            task =>
+                                task._id === taskId
+                        );
+
+
+                    if (!selectedTask) {
+
+                        console.error(
+                            "Selected task not found:",
+                            taskId
+                        );
+
+                        return;
+                    }
+
+
+                    // ==================================
+                    // STORE SELECTED TASK
+                    // ==================================
+
+                    window.selectedMemberTaskId =
+                        selectedTask._id;
+
+
+                    console.log(
+                        "Selected task:",
+                        selectedTask
+                    );
+
+
+                    // ==================================
+                    // SHOW DETAILS IMMEDIATELY
+                    // ==================================
+
+                    renderTaskDetails(
+                        selectedTask
+                    );
+
+
+                    // ==================================
+                    // HIGHLIGHT SELECTED ROW
+                    // ==================================
+
+                    renderMemberTasks(tasks);
+
+                }
+            );
+        });
+
+
+    updateMemberStats(tasks);
+}
+
+// =====================================================
+// TOKEN
+// =====================================================
+
+
+function getToken() {
+
+    return localStorage.getItem(
+        "taskflow_token"
+    );
+}
+
+
+// =====================================================
+// LOGOUT / CLEAR SESSION
+// =====================================================
+
+function clearSession() {
+
+    localStorage.removeItem(
+        "taskflow_token"
+    );
+
+    localStorage.removeItem(
+        "taskflow_user"
+    );
+}
+
+
+// =====================================================
+// TODAY LABEL
+// =====================================================
+
+function todayLabel() {
+
+    return new Date().toLocaleDateString(
+        "en-US",
+        {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+            year: "numeric"
+        }
+    );
+}
+
+
+// =====================================================
+// TOAST
+// =====================================================
+
+function showToast(message) {
+
+    let toast =
+        document.querySelector(".toast");
+
+    if (!toast) {
+
+        toast =
+            document.createElement("div");
+
+        toast.className = "toast";
+
+        document.body.appendChild(toast);
+    }
+
+    toast.textContent = message;
+
+    toast.classList.add("visible");
+
+    setTimeout(() => {
+        toast.classList.remove("visible");
+    }, 2500);
 }
 
 

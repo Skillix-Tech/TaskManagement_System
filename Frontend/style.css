@@ -885,3 +885,27 @@ table.task-table {
   .search-box { order: 3; max-width: none; }
   .page { padding: 20px; }
 }
+
+.selected-task {
+    background-color: #f0f7ff;
+}
+
+.selected-task td:first-child {
+    font-weight: 600;
+}
+
+.select-task-btn {
+    cursor: pointer;
+}
+
+.selected-task {
+    background: #eff6ff;
+}
+
+.selected-task td {
+    border-bottom-color: #bfdbfe;
+}
+
+.selected-task td:first-child {
+    font-weight: 700;
+}
